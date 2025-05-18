@@ -32,8 +32,6 @@
 // variaveis relacionadas a matriz de led
 PIO pio;
 uint sm;
-// variavel do display
-ssd1306_t ssd; // Inicializa a estrutura do display
 
 // inicializacao da PIO
 void PIO_setup(PIO *pio, uint *sm);
@@ -97,6 +95,36 @@ void vBuzzerTask(void *pvParameters)
     }
 }
 
+void vDisplayTask(void *pvParameters)
+{
+
+    ssd1306_t ssd; // Inicializa a estrutura do display
+    // I2C Initialisation. Using it at 400Khz.
+    i2c_init(I2C_PORT, 400 * 1000);
+
+    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
+    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
+    gpio_pull_up(I2C_SDA);                                        // Pull up the data line
+    gpio_pull_up(I2C_SCL);                                        // Pull up the clock line
+    ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); // Inicializa o display
+    ssd1306_config(&ssd);                                         // Configura o display
+    ssd1306_send_data(&ssd);                                      // Envia os dados para o display
+
+    // Limpa o display. O display inicia com todos os pixels apagados.
+    ssd1306_fill(&ssd, false);
+    ssd1306_send_data(&ssd);
+
+    while (1)
+    {
+        ssd1306_fill(&ssd, false); // LIMPA O DISPLAY
+        ssd1306_draw_string(&ssd, "Sistema de monitoramento", 0, 0);
+        ssd1306_draw_string(&ssd, "de enchentes", 0, 8);
+
+        ssd1306_send_data(&ssd);         // ATUALIZA A TELA
+        vTaskDelay(pdMS_TO_TICKS(1000)); // 1 segundo
+    }
+}
+
 int main()
 {
     stdio_init_all();
@@ -106,6 +134,7 @@ int main()
         // REGISTRO DAS TASKS
         xTaskCreate(vLedTask, "Task de gerenciamento do LED", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         // xTaskCreate(vBuzzerTask, "Task de gerenciamento do Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+        xTaskCreate(vDisplayTask, "Task de gerenciamento do display", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
         vTaskStartScheduler();
         panic_unsupported();
