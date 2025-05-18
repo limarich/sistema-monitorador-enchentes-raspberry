@@ -3,6 +3,7 @@
 #include "pico/stdlib.h"
 #include "FreeRTOS.h"
 #include "FreeRTOSConfig.h"
+#include "queue.h"
 #include "task.h"
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
@@ -14,6 +15,16 @@
 #include "lib/leds.h"
 #include "lib/ssd1306.h"
 #include "lib/font.h"
+
+typedef struct
+{
+    uint16_t x;
+    uint16_t y;
+} JoystickData;
+
+QueueHandle_t joystickQueue;
+#define QUEUE_LENGTH 10
+#define QUEUE_ITEM_SIZE sizeof(JoystickData)
 
 #define LED_RED 13            // pino do led vermelho
 #define LED_BLUE 12           // pino do led azul
@@ -97,6 +108,8 @@ void vBuzzerTask(void *pvParameters)
 void vDisplayTask(void *pvParameters)
 {
 
+    JoystickData data; // Estrutura para armazenar os dados do joystick
+
     ssd1306_t ssd; // Inicializa a estrutura do display
     // I2C Initialisation. Using it at 400Khz.
     i2c_init(I2C_PORT, 400 * 1000);
@@ -113,14 +126,26 @@ void vDisplayTask(void *pvParameters)
     ssd1306_fill(&ssd, false);
     ssd1306_send_data(&ssd);
 
+    char chuva[16], agua[16]; // Variáveis para armazenar os dados do joystick
+
     while (1)
     {
         ssd1306_fill(&ssd, false); // LIMPA O DISPLAY
         ssd1306_draw_string(&ssd, "Sistema de monitoramento", 0, 0);
         ssd1306_draw_string(&ssd, "de enchentes", 0, 8);
+        ssd1306_draw_string(&ssd, "", 0, 16);
+        ssd1306_draw_string(&ssd, "agua:", 0, 32);
+        if (xQueueReceive(joystickQueue, &data, portMAX_DELAY) == pdPASS)
+        {
+            snprintf(chuva, sizeof(chuva), "chuva: %d", data.x); // formata a leitura do joystick
+            snprintf(agua, sizeof(agua), "agua: %d", data.y);    // formata a leitura do joystick
 
-        ssd1306_send_data(&ssd);         // ATUALIZA A TELA
-        vTaskDelay(pdMS_TO_TICKS(1000)); // 1 segundo
+            ssd1306_draw_string(&ssd, chuva, 0, 16);
+            ssd1306_draw_string(&ssd, agua, 0, 32);
+        }
+
+        ssd1306_send_data(&ssd); // ATUALIZA A TELA
+        vTaskDelay(pdMS_TO_TICKS(250));
     }
 }
 
@@ -160,18 +185,39 @@ void vJoystickTask(void *pvParameters)
     {
         // LÊ O VALOR DO JOYSTICK
         adc_select_input(0);
-        uint16_t x = adc_read();
-        adc_select_input(1);
         uint16_t y = adc_read();
+        adc_select_input(1);
+        uint16_t x = adc_read();
+
+        // CRIA O OBJETO DE DADOS
+        JoystickData data = {x, y};
+
+        // ENVIA PARA A FILA
+        if (xQueueSend(joystickQueue, &data, pdMS_TO_TICKS(125)) == pdPASS)
+        {
+            printf("Enviado para a fila: X=%d, Y=%d\n", x, y);
+        }
+        else
+        {
+            printf("Fila cheia, dados perdidos!\n");
+        }
 
         printf("X: %d Y: %d\n", x, y); // IMPRIME O VALOR DO JOYSTICK
 
-        vTaskDelay(pdMS_TO_TICKS(100)); // 100ms
+        vTaskDelay(pdMS_TO_TICKS(250)); // 250ms
     }
 }
 int main()
 {
     stdio_init_all();
+
+    // Criação da fila
+    joystickQueue = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
+    if (joystickQueue == NULL)
+    {
+        printf("Erro ao criar a fila do joystick.\n");
+        return 1;
+    }
 
     while (true)
     {
@@ -180,7 +226,7 @@ int main()
         // xTaskCreate(vBuzzerTask, "Task de gerenciamento do Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vDisplayTask, "Task de gerenciamento do display", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vMatrixLedsTask, "Task de gerenciamento da matriz", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
-        xTaskCreate(vJoystickTask, "Task de gerenciamento do Joystick", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+        xTaskCreate(vJoystickTask, "Task de gerenciamento do Joystick", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
 
         vTaskStartScheduler();
         panic_unsupported();
