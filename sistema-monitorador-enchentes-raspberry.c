@@ -40,13 +40,56 @@ void PIO_setup(PIO *pio, uint *sm);
 // inicializa o display
 void ssd_setup();
 
+/* DEFINIÇÃO DAS TASKS*/
+
+void vLedTask(void *pvParameters)
+{
+    // INICIALIZA OS PINOS DO LED RGB
+    gpio_init(LED_RED);
+    gpio_init(LED_GREEN);
+    gpio_init(LED_BLUE);
+
+    // DEFINE OS PINOS COMO SAÍDA
+    gpio_set_dir(LED_RED, GPIO_OUT);
+    gpio_set_dir(LED_GREEN, GPIO_OUT);
+    gpio_set_dir(LED_BLUE, GPIO_OUT);
+
+    while (1)
+    {
+
+        // LIGA O LED VERMELHO
+        gpio_put(LED_RED, 1);
+        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
+        // DESLIGA O LED VERMELHO
+        gpio_put(LED_RED, 0);
+        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
+
+        // LIGA O LED VERDE
+        gpio_put(LED_GREEN, 1);
+        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
+        // DESLIGA O LED VERDE
+        gpio_put(LED_GREEN, 0);
+        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
+
+        // LIGA O LED AZUL
+        gpio_put(LED_BLUE, 1);
+        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
+        // DESLIGA O LED AZUL
+        gpio_put(LED_BLUE, 0);
+        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
+    }
+}
+
 int main()
 {
     stdio_init_all();
 
     while (true)
     {
-        printf("Hello, world!\n");
-        sleep_ms(1000);
+        // REGISTRO DAS TASKS
+        xTaskCreate(vLedTask, "Task de gerenciamento do LED", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+
+        vTaskStartScheduler();
+        panic_unsupported();
     }
 }
