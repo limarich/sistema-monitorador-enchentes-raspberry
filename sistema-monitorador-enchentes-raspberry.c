@@ -176,45 +176,59 @@ void vBuzzerTask(void *pvParameters)
 
 void vDisplayTask(void *pvParameters)
 {
-
     StatusLevel statusLevel; // Estrutura para armazenar os dados dos sensores
 
     ssd1306_t ssd; // Inicializa a estrutura do display
-    // I2C Initialisation. Using it at 400Khz.
     i2c_init(I2C_PORT, 400 * 1000);
+    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
+    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
+    gpio_pull_up(I2C_SDA);
+    gpio_pull_up(I2C_SCL);
+    ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT);
+    ssd1306_config(&ssd);
+    ssd1306_send_data(&ssd);
 
-    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
-    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
-    gpio_pull_up(I2C_SDA);                                        // Pull up the data line
-    gpio_pull_up(I2C_SCL);                                        // Pull up the clock line
-    ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); // Inicializa o display
-    ssd1306_config(&ssd);                                         // Configura o display
-    ssd1306_send_data(&ssd);                                      // Envia os dados para o display
-
-    // Limpa o display. O display inicia com todos os pixels apagados.
+    // Limpa o display na inicialização
     ssd1306_fill(&ssd, false);
     ssd1306_send_data(&ssd);
 
-    char chuva[16], agua[16]; // Variáveis para armazenar os dados do joystick
+    char chuva[16], agua[16];
+    int invert = 0; // Variável para controlar a inversão de cores
 
     while (1)
     {
-        ssd1306_fill(&ssd, false); // LIMPA O DISPLAY
-        ssd1306_draw_string(&ssd, "Sistema de monitoramento", 0, 0);
-        ssd1306_draw_string(&ssd, "de enchentes", 0, 8);
-        ssd1306_draw_string(&ssd, "", 0, 16);
-        ssd1306_draw_string(&ssd, "agua:", 0, 32);
+        // Limpa o display
+        ssd1306_fill(&ssd, invert);
+
+        // Tenta ler os dados da fila indefinidamente
         if (xQueueReceive(statusQueue, &statusLevel, portMAX_DELAY) == pdPASS)
         {
-            snprintf(chuva, sizeof(chuva), "chuva: %.2f%%", statusLevel.rain_level * 100); // formata a leitura do joystick
-            snprintf(agua, sizeof(agua), "agua: %.2f%%", statusLevel.water_level * 100);   // formata a leitura do joystick
+            // Formata os valores de chuva e água para exibir no display
+            snprintf(chuva, sizeof(chuva), "chuva: %.2f%%", statusLevel.rain_level * 100);
+            snprintf(agua, sizeof(agua), "agua: %.2f%%", statusLevel.water_level * 100);
 
-            ssd1306_draw_string(&ssd, chuva, 0, 16);
-            ssd1306_draw_string(&ssd, agua, 0, 32);
+            // Verifica se o nível de água ou chuva está em estado crítico
+            if (statusLevel.water_level >= 0.70 || statusLevel.rain_level >= 0.80)
+            {
+                // Efeito de alerta com inversão de cores
+                invert = !invert;
+                // Exibe os textos em tamanho maior
+                ssd1306_draw_string(&ssd, "ALERTA!", 0, 0);
+                ssd1306_draw_string(&ssd, chuva, 0, 20);
+                ssd1306_draw_string(&ssd, agua, 0, 40);
+            }
+            else
+            {
+                // Exibe os textos normalmente
+                ssd1306_draw_string(&ssd, chuva, 0, 16);
+                ssd1306_draw_string(&ssd, agua, 0, 32);
+                invert = 0; // Reseta a inversão de cores
+            }
         }
 
-        ssd1306_send_data(&ssd); // ATUALIZA A TELA
-        vTaskDelay(pdMS_TO_TICKS(50));
+        // Atualiza o display
+        ssd1306_send_data(&ssd);
+        vTaskDelay(pdMS_TO_TICKS(200)); // Intervalo reduzido para melhor responsividade
     }
 }
 
