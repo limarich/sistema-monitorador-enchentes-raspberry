@@ -29,10 +29,6 @@
 #define I2C_SCL 15            // PINO DO SCL
 #define endereco 0x3C         // ENDEREÇO
 
-// variaveis relacionadas a matriz de led
-PIO pio;
-uint sm;
-
 // inicializacao da PIO
 void PIO_setup(PIO *pio, uint *sm);
 // inicializa o display
@@ -125,6 +121,30 @@ void vDisplayTask(void *pvParameters)
     }
 }
 
+void vMatrixLedsTask(void *pvParameters)
+{
+    PIO pio;
+    uint sm;
+    // configurações da PIO
+    pio = pio0;
+    uint offset = pio_add_program(pio, &pio_matrix_program);
+    sm = pio_claim_unused_sm(pio, true);
+    pio_matrix_program_init(pio, sm, offset, LED_PIN);
+
+    pixel draw[PIXELS];
+    test_matrix(pio, sm);
+    while (1)
+    {
+        // TESTE DA MATRIZ
+        draw_traffic_light(pio, sm, GREEN, false);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        draw_traffic_light(pio, sm, YELLOW, false);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        draw_traffic_light(pio, sm, RED, false);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 int main()
 {
     stdio_init_all();
@@ -135,6 +155,7 @@ int main()
         xTaskCreate(vLedTask, "Task de gerenciamento do LED", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         // xTaskCreate(vBuzzerTask, "Task de gerenciamento do Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vDisplayTask, "Task de gerenciamento do display", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+        xTaskCreate(vMatrixLedsTask, "Task de gerenciamento da matriz", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
         vTaskStartScheduler();
         panic_unsupported();
