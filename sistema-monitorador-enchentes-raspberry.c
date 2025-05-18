@@ -26,22 +26,22 @@ QueueHandle_t statusQueue;
 #define QUEUE_LENGTH 10
 #define QUEUE_ITEM_SIZE sizeof(StatusLevel)
 
-#define LED_RED 13            // pino do led vermelho
-#define LED_BLUE 12           // pino do led azul
-#define LED_GREEN 11          // pino do led verde
-#define signalDelay 1000      // tempo que o led fica aceso
-#define BUTTON_A 5            // BOTÃO B para mudar o modo do semáforo
-#define BUTTON_B 6            // BOTÃO A para desligar o beep
-#define DEBOUNCE_MS 200       // intervalo minimo de 200ms para o debounce
-#define BUZZER_A 10           // PORTA DO BUZZER A
-#define BUZZER_B 21           // PORTA DO BUZZER B
-#define BUZZER_FREQUENCY 1500 // FREQUENCIA DO BUZZER
-#define I2C_PORT i2c1         // PORTA DO i2C
-#define I2C_SDA 14            // PINO DO SDA
-#define I2C_SCL 15            // PINO DO SCL
-#define endereco 0x3C         // ENDEREÇO
-#define JOYSTICK_X 27         // pino do joystick X
-#define JOYSTICK_Y 26         // pino do joystick Y
+#define LED_RED 13           // pino do led vermelho
+#define LED_BLUE 12          // pino do led azul
+#define LED_GREEN 11         // pino do led verde
+#define signalDelay 1000     // tempo que o led fica aceso
+#define BUTTON_A 5           // BOTÃO B para mudar o modo do semáforo
+#define BUTTON_B 6           // BOTÃO A para desligar o beep
+#define DEBOUNCE_MS 200      // intervalo minimo de 200ms para o debounce
+#define BUZZER_A 10          // PORTA DO BUZZER A
+#define BUZZER_B 21          // PORTA DO BUZZER B
+#define BUZZER_FREQUENCY 200 // FREQUENCIA DO BUZZER
+#define I2C_PORT i2c1        // PORTA DO i2C
+#define I2C_SDA 14           // PINO DO SDA
+#define I2C_SCL 15           // PINO DO SCL
+#define endereco 0x3C        // ENDEREÇO
+#define JOYSTICK_X 27        // pino do joystick X
+#define JOYSTICK_Y 26        // pino do joystick Y
 
 // inicializacao da PIO
 void PIO_setup(PIO *pio, uint *sm);
@@ -90,18 +90,53 @@ void vLedTask(void *pvParameters)
 
 void vBuzzerTask(void *pvParameters)
 {
-    // INCIALIZA OS BUZZERS
+    StatusLevel statusLevel; // Estrutura para armazenar os níveis de água e chuva
+
+    // Inicializa os buzzers
     initialization_buzzers(BUZZER_A, BUZZER_B);
 
     while (1)
     {
-
-        buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 1000);     // 1000ms
-        vTaskDelay(pdMS_TO_TICKS(1000));                  // 1 segundo
-        buzzer_pwm(BUZZER_B, BUZZER_FREQUENCY * 3, 1000); // 1000ms
-        vTaskDelay(pdMS_TO_TICKS(1000));                  // 1 segundo
-        buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY * 6, 1000); // 1000ms
-        vTaskDelay(pdMS_TO_TICKS(1000));                  // 1 segundo
+        // Tenta ler os dados da fila indefinidamente
+        if (xQueueReceive(statusQueue, &statusLevel, portMAX_DELAY) == pdPASS)
+        {
+            // Verifica se o nível de água está acima de 70%
+            if (statusLevel.water_level > 0.70)
+            {
+                // Verifica se o nível de chuva também está acima de 80%
+                if (statusLevel.rain_level > 0.80)
+                {
+                    // Ativa os buzzers com uma frequência mais alta para indicar estado crítico
+                    buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY * 8, 100); // Ativa o Buzzer A por 100ms
+                    vTaskDelay(pdMS_TO_TICKS(50));                   // Aguarda 50ms
+                    buzzer_pwm(BUZZER_B, BUZZER_FREQUENCY * 8, 100); // Ativa o Buzzer B por 100ms
+                    vTaskDelay(pdMS_TO_TICKS(50));                   // Aguarda 50ms
+                    buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY * 8, 100); // Ativa o Buzzer A por 100ms
+                    vTaskDelay(pdMS_TO_TICKS(50));                   // Aguarda 50ms
+                }
+                else
+                {
+                    // Ativa os buzzers com frequência moderada para indicar nível de água alto
+                    buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY * 3, 30); // Ativa o Buzzer A por 30ms
+                    vTaskDelay(pdMS_TO_TICKS(50));                  // Aguarda 50ms
+                    buzzer_pwm(BUZZER_B, BUZZER_FREQUENCY * 3, 30); // Ativa o Buzzer B por 30ms
+                    vTaskDelay(pdMS_TO_TICKS(50));                  // Aguarda 50ms
+                    buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY * 3, 30); // Ativa o Buzzer A por 30ms
+                    vTaskDelay(pdMS_TO_TICKS(50));                  // Aguarda 50ms
+                }
+            }
+            // Verifica se apenas o nível de chuva está acima de 80%
+            else if (statusLevel.rain_level > 0.80)
+            {
+                // Ativa os buzzers com frequência muito alta para indicar nível crítico de chuva
+                buzzer_pwm(BUZZER_B, BUZZER_FREQUENCY * 15, 30); // Ativa o Buzzer B por 30ms
+                vTaskDelay(pdMS_TO_TICKS(50));                   // Aguarda 50ms
+                buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY * 15, 30); // Ativa o Buzzer A por 30ms
+                vTaskDelay(pdMS_TO_TICKS(50));                   // Aguarda 50ms
+                buzzer_pwm(BUZZER_B, BUZZER_FREQUENCY * 15, 30); // Ativa o Buzzer B por 30ms
+                vTaskDelay(pdMS_TO_TICKS(50));                   // Aguarda 50ms
+            }
+        }
     }
 }
 
@@ -245,7 +280,7 @@ int main()
     {
         // REGISTRO DAS TASKS
         xTaskCreate(vLedTask, "Task de gerenciamento do LED", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
-        // xTaskCreate(vBuzzerTask, "Task de gerenciamento do Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+        xTaskCreate(vBuzzerTask, "Task de gerenciamento do Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vDisplayTask, "Task de gerenciamento do display", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vMatrixLedsTask, "Task de gerenciamento da matriz", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vJoystickTask, "Task de gerenciamento do Joystick", configMINIMAL_STACK_SIZE, NULL, 2, NULL);

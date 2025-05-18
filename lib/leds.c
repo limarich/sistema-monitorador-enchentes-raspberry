@@ -113,7 +113,7 @@ pixel handle_color(color_options color, float intensity)
 void draw_status_level(PIO pio, uint sm, float water_level, float rain_level)
 {
 
-    pixel default_color = (water_level > 0.75 || rain_level > 0.75) ? handle_color(RED, 0.15) : handle_color(BLACK, 1);
+    pixel default_color = (water_level > 0.7 || rain_level > 0.80) ? handle_color(RED, 0.15) : handle_color(BLACK, 1);
 
     frame matrix;
 
@@ -130,7 +130,7 @@ void draw_status_level(PIO pio, uint sm, float water_level, float rain_level)
     int rain_intensity = (int)(rain_level * 5);
 
     pixel water_color = handle_color(BLUE, water_brightness);
-    pixel rain_color = handle_color(GRAY, rain_brightness);
+    pixel rain_color = handle_color(YELLOW, rain_brightness);
 
     // uint a matriz com a cor preta
     for (int16_t i = 0; i < PIXELS; i++)
