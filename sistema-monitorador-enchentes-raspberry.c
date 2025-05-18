@@ -80,6 +80,23 @@ void vLedTask(void *pvParameters)
     }
 }
 
+void vBuzzerTask(void *pvParameters)
+{
+    // INCIALIZA OS BUZZERS
+    initialization_buzzers(BUZZER_A, BUZZER_B);
+
+    while (1)
+    {
+
+        buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 1000);     // 1000ms
+        vTaskDelay(pdMS_TO_TICKS(1000));                  // 1 segundo
+        buzzer_pwm(BUZZER_B, BUZZER_FREQUENCY * 3, 1000); // 1000ms
+        vTaskDelay(pdMS_TO_TICKS(1000));                  // 1 segundo
+        buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY * 6, 1000); // 1000ms
+        vTaskDelay(pdMS_TO_TICKS(1000));                  // 1 segundo
+    }
+}
+
 int main()
 {
     stdio_init_all();
@@ -88,6 +105,7 @@ int main()
     {
         // REGISTRO DAS TASKS
         xTaskCreate(vLedTask, "Task de gerenciamento do LED", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+        // xTaskCreate(vBuzzerTask, "Task de gerenciamento do Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
         vTaskStartScheduler();
         panic_unsupported();
