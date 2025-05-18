@@ -7,6 +7,7 @@
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
 #include "hardware/i2c.h"
+#include "hardware/adc.h"
 
 #include "pio_matrix.pio.h"
 #include "lib/buzzer.h"
@@ -28,6 +29,8 @@
 #define I2C_SDA 14            // PINO DO SDA
 #define I2C_SCL 15            // PINO DO SCL
 #define endereco 0x3C         // ENDEREÇO
+#define JOYSTICK_X 27         // pino do joystick X
+#define JOYSTICK_Y 26         // pino do joystick Y
 
 // inicializacao da PIO
 void PIO_setup(PIO *pio, uint *sm);
@@ -145,6 +148,27 @@ void vMatrixLedsTask(void *pvParameters)
     }
 }
 
+void vJoystickTask(void *pvParameters)
+{
+    adc_init(); // INICIALIZA O ADC
+
+    // INICIALIZA O JOYSTICK
+    adc_gpio_init(JOYSTICK_X);
+    adc_gpio_init(JOYSTICK_Y);
+
+    while (1)
+    {
+        // LÊ O VALOR DO JOYSTICK
+        adc_select_input(0);
+        uint16_t x = adc_read();
+        adc_select_input(1);
+        uint16_t y = adc_read();
+
+        printf("X: %d Y: %d\n", x, y); // IMPRIME O VALOR DO JOYSTICK
+
+        vTaskDelay(pdMS_TO_TICKS(100)); // 100ms
+    }
+}
 int main()
 {
     stdio_init_all();
@@ -156,6 +180,7 @@ int main()
         // xTaskCreate(vBuzzerTask, "Task de gerenciamento do Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vDisplayTask, "Task de gerenciamento do display", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
         xTaskCreate(vMatrixLedsTask, "Task de gerenciamento da matriz", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+        xTaskCreate(vJoystickTask, "Task de gerenciamento do Joystick", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
         vTaskStartScheduler();
         panic_unsupported();
