@@ -52,39 +52,73 @@ void ssd_setup();
 
 void vLedTask(void *pvParameters)
 {
-    // INICIALIZA OS PINOS DO LED RGB
+    StatusLevel statusLevel; // Estrutura para armazenar os níveis de água e chuva
+
+    // Inicializa os pinos do LED RGB
     gpio_init(LED_RED);
     gpio_init(LED_GREEN);
     gpio_init(LED_BLUE);
 
-    // DEFINE OS PINOS COMO SAÍDA
+    // Define os pinos como saída
     gpio_set_dir(LED_RED, GPIO_OUT);
     gpio_set_dir(LED_GREEN, GPIO_OUT);
     gpio_set_dir(LED_BLUE, GPIO_OUT);
 
     while (1)
     {
-
-        // LIGA O LED VERMELHO
-        gpio_put(LED_RED, 1);
-        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
-        // DESLIGA O LED VERMELHO
-        gpio_put(LED_RED, 0);
-        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
-
-        // LIGA O LED VERDE
-        gpio_put(LED_GREEN, 1);
-        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
-        // DESLIGA O LED VERDE
-        gpio_put(LED_GREEN, 0);
-        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
-
-        // LIGA O LED AZUL
-        gpio_put(LED_BLUE, 1);
-        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
-        // DESLIGA O LED AZUL
-        gpio_put(LED_BLUE, 0);
-        vTaskDelay(signalDelay / portTICK_PERIOD_MS);
+        // Tenta ler os dados da fila indefinidamente
+        if (xQueueReceive(statusQueue, &statusLevel, portMAX_DELAY) == pdPASS)
+        {
+            // Verifica se o nível de água está acima de 70%
+            if (statusLevel.water_level > 0.70)
+            {
+                // Verifica se o nível de chuva também está acima de 80%
+                if (statusLevel.rain_level > 0.80)
+                {
+                    // LED Vermelho (Nível Crítico de Água e Chuva)
+                    for (int i = 0; i < 2; i++)
+                    {
+                        gpio_put(LED_RED, 1); // Liga o LED vermelho
+                        vTaskDelay(100);      // Atraso de 100ms
+                        gpio_put(LED_RED, 0); // Desliga o LED vermelho
+                        vTaskDelay(100);      // Atraso de 100ms
+                    }
+                }
+                else
+                {
+                    // LED Azul (Nível Crítico de Água, Chuva Moderada)
+                    for (int i = 0; i < 2; i++)
+                    {
+                        gpio_put(LED_BLUE, 1); // Liga o LED azul
+                        vTaskDelay(100);       // Atraso de 100ms
+                        gpio_put(LED_BLUE, 0); // Desliga o LED azul
+                        vTaskDelay(100);       // Atraso de 100ms
+                    }
+                }
+            }
+            // Verifica se apenas o nível de chuva está acima de 80%
+            else if (statusLevel.rain_level > 0.80)
+            {
+                // LED Amarelo (Nível Crítico de Chuva, Água Moderada)
+                for (int i = 0; i < 2; i++)
+                {
+                    gpio_put(LED_RED, 1);   // Liga o LED vermelho
+                    gpio_put(LED_GREEN, 1); // Liga o LED verde (amarelo)
+                    vTaskDelay(100);        // Atraso de 100ms
+                    gpio_put(LED_RED, 0);   // Desliga o LED vermelho
+                    gpio_put(LED_GREEN, 0); // Desliga o LED verde
+                    vTaskDelay(100);        // Atraso de 100ms
+                }
+            }
+            else
+            {
+                // LED Verde (Condições Normais)
+                gpio_put(LED_GREEN, 1); // Liga o LED verde
+                vTaskDelay(300);        // Atraso de 300ms
+                gpio_put(LED_GREEN, 0); // Desliga o LED verde
+                vTaskDelay(300);        // Atraso de 300ms
+            }
+        }
     }
 }
 
