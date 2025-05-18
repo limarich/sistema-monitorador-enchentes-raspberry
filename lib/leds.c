@@ -110,58 +110,50 @@ pixel handle_color(color_options color, float intensity)
     return pixel_color;
 }
 
-/*
-    Desenha o padrão do semáforo na matriz de leds baseado no valor da cor(color_option) informado e da flag night mode
-
-    color red -> sinal vermelho
-    color yellow -> sinal amarelo
-    color green -> sinal verde
-
-    se a flag night mode não for informada, todas as cores ficarão acesas, com baixa intensidade,
-    exceto a cor escolhida que terá a luminosidade máxima
-
-    flag night mode -> apenas o sinal amarelo
-*/
-void draw_traffic_light(PIO pio, uint sm, color_options color, bool night_mode)
+void draw_status_level(PIO pio, uint sm, float water_level, float rain_level)
 {
 
-    pixel pixel_color = handle_color(color, 1);
     pixel black = handle_color(BLACK, 1);
-    pixel gray = handle_color(GRAY, 0.05f);
-    pixel red = handle_color(RED, 0.01f);
-    pixel green = handle_color(GREEN, 0.01f);
-    pixel yellow = handle_color(YELLOW, 0.01f);
 
-    frame matrix = {
-        black, gray, gray, gray, black,
-        black, gray, green, gray, black,
-        black, gray, yellow, gray, black,
-        black, gray, red, gray, black,
-        black, gray, gray, gray, black};
+    frame matrix;
 
-    if (night_mode)
-    { // se estiver no modo noturno mantem o led vermelho e verde apagado
-        matrix[17].intensity = 0;
-        matrix[7].intensity = 0;
+    // indices da matriz reservados para o nivel de agua e chuva
+    uint water_index[5] = {1, 8, 11, 18, 21};
+    uint rain_index[5] = {3, 6, 13, 16, 23};
+
+    // brilho da agua e chuva
+    float water_brightness = water_level * 1;
+    float rain_brightness = rain_level * 1;
+
+    // intensidade do nivel de agua e chuva
+    int water_intensity = (int)(water_level * 5);
+    int rain_intensity = (int)(rain_level * 5);
+
+    pixel water_color = handle_color(BLUE, water_brightness);
+    pixel rain_color = handle_color(GRAY, rain_brightness);
+
+    // uint a matriz com a cor preta
+    for (int16_t i = 0; i < PIXELS; i++)
+    {
+        matrix[i] = black;
     }
 
-    if (color == RED)
+    // Preenche os LEDs para o nível de água
+    for (int i = 0; i < 5; i++)
     {
-        matrix[17].intensity = 1;
+        if (i < water_intensity)
+        {
+            matrix[water_index[i]] = water_color;
+        }
     }
-    else if (color == GREEN)
+
+    // Preenche os LEDs para o nível de chuva
+    for (int i = 0; i < 5; i++)
     {
-        matrix[7].intensity = 1;
-    }
-    else if (color == YELLOW)
-    {
-        matrix[12].intensity = 1;
-    }
-    else if (color == BLACK)
-    {
-        matrix[17] = black;
-        matrix[7] = black;
-        matrix[12] = black;
+        if (i < rain_intensity)
+        {
+            matrix[rain_index[i]] = rain_color;
+        }
     }
 
     draw_pio(matrix, pio, sm);

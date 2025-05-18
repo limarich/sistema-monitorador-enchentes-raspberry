@@ -18,13 +18,13 @@
 
 typedef struct
 {
-    uint16_t x;
-    uint16_t y;
-} JoystickData;
+    float rain_level;
+    float water_level;
+} StatusLevel;
 
-QueueHandle_t joystickQueue;
+QueueHandle_t statusQueue;
 #define QUEUE_LENGTH 10
-#define QUEUE_ITEM_SIZE sizeof(JoystickData)
+#define QUEUE_ITEM_SIZE sizeof(StatusLevel)
 
 #define LED_RED 13            // pino do led vermelho
 #define LED_BLUE 12           // pino do led azul
@@ -108,7 +108,7 @@ void vBuzzerTask(void *pvParameters)
 void vDisplayTask(void *pvParameters)
 {
 
-    JoystickData data; // Estrutura para armazenar os dados do joystick
+    StatusLevel statusLevel; // Estrutura para armazenar os dados dos sensores
 
     ssd1306_t ssd; // Inicializa a estrutura do display
     // I2C Initialisation. Using it at 400Khz.
@@ -135,22 +135,24 @@ void vDisplayTask(void *pvParameters)
         ssd1306_draw_string(&ssd, "de enchentes", 0, 8);
         ssd1306_draw_string(&ssd, "", 0, 16);
         ssd1306_draw_string(&ssd, "agua:", 0, 32);
-        if (xQueueReceive(joystickQueue, &data, portMAX_DELAY) == pdPASS)
+        if (xQueueReceive(statusQueue, &statusLevel, portMAX_DELAY) == pdPASS)
         {
-            snprintf(chuva, sizeof(chuva), "chuva: %d", data.x); // formata a leitura do joystick
-            snprintf(agua, sizeof(agua), "agua: %d", data.y);    // formata a leitura do joystick
+            snprintf(chuva, sizeof(chuva), "chuva: %.2f%%", statusLevel.rain_level * 100); // formata a leitura do joystick
+            snprintf(agua, sizeof(agua), "agua: %.2f%%", statusLevel.water_level * 100);   // formata a leitura do joystick
 
             ssd1306_draw_string(&ssd, chuva, 0, 16);
             ssd1306_draw_string(&ssd, agua, 0, 32);
         }
 
         ssd1306_send_data(&ssd); // ATUALIZA A TELA
-        vTaskDelay(pdMS_TO_TICKS(250));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
 void vMatrixLedsTask(void *pvParameters)
 {
+    StatusLevel statusLevel; // Estrutura para armazenar os dados dos sensores
+
     PIO pio;
     uint sm;
     // configurações da PIO
@@ -163,13 +165,12 @@ void vMatrixLedsTask(void *pvParameters)
     test_matrix(pio, sm);
     while (1)
     {
-        // TESTE DA MATRIZ
-        draw_traffic_light(pio, sm, GREEN, false);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        draw_traffic_light(pio, sm, YELLOW, false);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        draw_traffic_light(pio, sm, RED, false);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        if (xQueueReceive(statusQueue, &statusLevel, portMAX_DELAY) == pdPASS)
+        {
+            draw_status_level(pio, sm, statusLevel.water_level, statusLevel.rain_level); // desenha o grafico
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
@@ -181,41 +182,62 @@ void vJoystickTask(void *pvParameters)
     adc_gpio_init(JOYSTICK_X);
     adc_gpio_init(JOYSTICK_Y);
 
+    // Lê os valores de idle (posição neutra)
+    adc_select_input(0);
+    uint16_t y_idle = adc_read();
+    adc_select_input(1);
+    uint16_t x_idle = adc_read();
+
     while (1)
     {
         // LÊ O VALOR DO JOYSTICK
         adc_select_input(0);
-        uint16_t y = adc_read();
+        int16_t y_raw = adc_read() - y_idle;
         adc_select_input(1);
-        uint16_t x = adc_read();
+        int16_t x_raw = adc_read() - x_idle;
+
+        // NORMALIZA PARA A FAIXA 0.0 a 1.0
+        float y_normalized = (float)(y_raw + 2048) / 4095.0f;
+        float x_normalized = (float)(x_raw + 2048) / 4095.0f;
+
+        // GARANTE QUE OS VALORES FIQUEM ENTRE 0 e 1
+        if (y_normalized < 0.0f)
+            y_normalized = 0.0f;
+        if (y_normalized > 1.0f)
+            y_normalized = 1.0f;
+        if (x_normalized < 0.0f)
+            x_normalized = 0.0f;
+        if (x_normalized > 1.0f)
+            x_normalized = 1.0f;
 
         // CRIA O OBJETO DE DADOS
-        JoystickData data = {x, y};
+        StatusLevel statusLevel = {
+            .rain_level = x_normalized,
+            .water_level = y_normalized};
 
         // ENVIA PARA A FILA
-        if (xQueueSend(joystickQueue, &data, pdMS_TO_TICKS(125)) == pdPASS)
+        if (xQueueSend(statusQueue, &statusLevel, pdMS_TO_TICKS(125)) == pdPASS)
         {
-            printf("Enviado para a fila: X=%d, Y=%d\n", x, y);
+            printf("Enviado para a fila: chuva=%.2f, agua=%.2f\n", statusLevel.rain_level, statusLevel.water_level);
         }
         else
         {
             printf("Fila cheia, dados perdidos!\n");
         }
 
-        printf("X: %d Y: %d\n", x, y); // IMPRIME O VALOR DO JOYSTICK
-
         vTaskDelay(pdMS_TO_TICKS(250)); // 250ms
     }
 }
+
 int main()
 {
     stdio_init_all();
 
     // Criação da fila
-    joystickQueue = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
-    if (joystickQueue == NULL)
+    statusQueue = xQueueCreate(QUEUE_LENGTH, QUEUE_ITEM_SIZE);
+    if (statusQueue == NULL)
     {
-        printf("Erro ao criar a fila do joystick.\n");
+        printf("Erro ao criar a fila dos sensores.\n");
         return 1;
     }
 

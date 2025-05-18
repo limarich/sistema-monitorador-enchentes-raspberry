@@ -53,7 +53,7 @@ void draw_pio(pixel *draw, PIO pio, uint sm);
 
 void test_matrix(PIO pio, uint sm);
 
-// desenha um semáfaro com a cor indicada
-void draw_traffic_light(PIO pio, uint sm, color_options color, bool night_mode);
+// desenha um grafico indicando o nivel de agua e chuva
+void draw_status_level(PIO pio, uint sm, float water_level, float rain_level);
 
 #endif
