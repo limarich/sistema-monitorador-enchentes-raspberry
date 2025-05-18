@@ -20,15 +20,23 @@ pico_set_program_version(${PROJECT_NAME} "0.1")
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
 
+include_directories(${CMAKE_SOURCE_DIR}/lib)
+
 target_link_libraries(${PROJECT_NAME}
-        pico_stdlib)
+        pico_stdlib 
+        FreeRTOS-Kernel         
+        FreeRTOS-Kernel-Heap4  
+)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME} 
-        
+        hardware_pwm
+        hardware_pio
+        hardware_clocks
+        hardware_i2c
         )
 
 pico_add_extra_outputs(${PROJECT_NAME})
