@@ -10,7 +10,9 @@ pico_sdk_init()
 set(FREERTOS_KERNEL_PATH "/Users/richard/FreeRTOS-Kernel")
 include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
 
-add_executable(${PROJECT_NAME} sistema-monitorador-enchentes-raspberry.c )
+add_executable(${PROJECT_NAME} sistema-monitorador-enchentes-raspberry.c lib/buzzer.c lib/leds.c lib/ssd1306.c)
+
+pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_matrix.pio)
 
 pico_set_program_name(${PROJECT_NAME} "sistema-monitorador-enchentes-raspberry")
 pico_set_program_version(${PROJECT_NAME} "0.1")
