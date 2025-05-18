@@ -113,7 +113,7 @@ pixel handle_color(color_options color, float intensity)
 void draw_status_level(PIO pio, uint sm, float water_level, float rain_level)
 {
 
-    pixel black = handle_color(BLACK, 1);
+    pixel default_color = (water_level > 0.75 || rain_level > 0.75) ? handle_color(RED, 0.15) : handle_color(BLACK, 1);
 
     frame matrix;
 
@@ -135,7 +135,7 @@ void draw_status_level(PIO pio, uint sm, float water_level, float rain_level)
     // uint a matriz com a cor preta
     for (int16_t i = 0; i < PIXELS; i++)
     {
-        matrix[i] = black;
+        matrix[i] = default_color;
     }
 
     // Preenche os LEDs para o nível de água
