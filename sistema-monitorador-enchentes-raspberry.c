@@ -16,6 +16,7 @@
 #include "lib/ssd1306.h"
 #include "lib/font.h"
 
+// estrutura para armazenar os dados dos sensores
 typedef struct
 {
     float rain_level;
